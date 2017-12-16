@@ -46,11 +46,16 @@ const fetchArticles = urls => {
   const asyncFetch = urls.map(async (url,index) => {
     await fetch(url)
       .then(response => {
-        if (response.ok) {
+        try {
+          if (response.ok) {
           console.log("Fetch: ", `${response.url} => ${response.status}`)
           return response.text(); // レスポンスをテキストとして変換する
-        } else {
-          throw new Error(`FetchError: ${response.url} => ${response.status}`)
+          } else {
+            throw new Error(`FetchError: ${response.url} => ${response.status}`)
+          }
+        } catch (error) {
+          console.log(error)
+          reject(error)
         }
       })
       // DOM parsing
@@ -86,7 +91,7 @@ const fetchArticles = urls => {
 }
 
 const stylingBukkenData = () => {
-  const styling = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const customCSSContent = `
       <style>
         .entry-data {
@@ -119,27 +124,34 @@ const stylingBukkenData = () => {
     `;
 
     // adding <style>~~~</style>  to <head>
-    document.head.insertAdjacentHTML("beforeend", customCSSContent);
-    resolve()
+    if (document.head) {
+      document.head.insertAdjacentHTML("beforeend", customCSSContent);
+      resolve()
+    } else {
+      reject('headタグ見当たらない')
+    }
   })
 }
 
 const reMasonry = () => {
-  const masonry = new Promise((resolve, reject) => {
-    var msnry = new Masonry(".portal-entry-list", {
-      itemSelector: ".portal-entry", // target item
-      columnWidth: 240,
-      gutter: 15 // margin
-    })
-    resolve()
+  return new Promise((resolve, reject) => {
+      if (typeof Masonry !== 'undefined') {
+        var msnry = new Masonry(".portal-entry-list", {
+          itemSelector: ".portal-entry", // target item
+          columnWidth: 240,
+          gutter: 15 // margin
+        })
+        resolve()
+      } else {
+        reject('Masonry見当たらない')
+      }
   })
-  return masonry
 }
 
 async function showBukkenData() {
-  await stylingBukkenData()
-  await fetchArticles(articleUrls)
-  await reMasonry()
+  await stylingBukkenData().catch(error => console.error(error))
+  await fetchArticles(articleUrls).catch(error => console.error(error))
+  await reMasonry().catch(error => console.error(error))
 }
 
 // Your code end...
