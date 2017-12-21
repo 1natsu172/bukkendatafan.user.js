@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         bukkendatafan
 // @namespace    https://github.com/1natsu172/bukkendatafan.user.js
-// @version      0.1
+// @version      1.0
 // @description  物件ファンのトップページの各記事に物件の賃料や所在地などの情報を表示するユーザースクリプト
 // @author       1natsu
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.2/babel.js
