@@ -6,7 +6,7 @@
 // @author       1natsu
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.2/babel.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.16.0/polyfill.js
-// @match        https://bukkenfan.jp/
+// @match        https://bukkenfan.jp/*
 // @updateURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
 // @downloadURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
 // @supportURL https://github.com/1natsu172/bukkendatafan.user.js/issues
