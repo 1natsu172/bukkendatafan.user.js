@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         bukkendatafan
 // @namespace    https://github.com/1natsu172/bukkendatafan.user.js
-// @version      0.1
+// @version      1.0
 // @description  物件ファンのトップページの各記事に物件の賃料や所在地などの情報を表示するユーザースクリプト
 // @author       1natsu
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.2/babel.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.16.0/polyfill.js
-// @match        https://bukkenfan.jp/
+// @match        https://bukkenfan.jp/*
 // @updateURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
 // @downloadURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
 // @supportURL https://github.com/1natsu172/bukkendatafan.user.js/issues
@@ -21,38 +21,85 @@ var inline_src = (<><![CDATA[
     /* jshint asi: true */
 
     // Your code here...
-// 監視対象のノードを取得
-const observeTarget = document.querySelector(".portal-entry-list");
+    console.log('[BukkenDataFan]','Hi, BukkenDataFan\'s bro!')
 
-// トップページのエントリ記事のタイル、動的に差し込まれるのでその処理が終わるまで行儀よく待つ
-// masonryの処理でattributeが変更されるのでそれを監視する = DOMが準備された ＝ querySelectorAllができる
-const entryListObserver = new MutationObserver((mutations) => {
-  entryListObserver.disconnect(); //監視終了
-  showBukkenData()
-});
-// 監視メソッドを設定
-entryListObserver.observe(observeTarget, {
-  attributes: true,
-});
+function PromiseMutationObserver(element, attributeName, rejectTime = 0) {
+    return new Promise((resolve,reject) => {
+        let hasChanged = false
+        const observerConfig = {attributes: true, attributeOldValue:true}
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+              if (attributeName && mutation.attributeName == attributeName) {
+                  hasChanged = true
+                  observer.disconnect()
+                  resolve(element, element.getAttribute(attributeName))
+              }
+              
+              if (!attributeName) {
+                  hasChanged = true
+                  observer.disconnect()
+                  resolve(element)
+              }
+          })
+        })
+        
+        if (rejectTime > 0) {
+            window.setTimeout(()=>{
+                if (!hasChanged) {
+                    reject(element)
+                }
+            },rejectTime * 100)
+        }
+        
+        if (attributeName) observerConfig.attributeFilter = [attributeName]
+        observer.observe(element, observerConfig)
+    })
+}
 
-const entryUrlArray = () => {
-  return new Promise((resolve, reject) => {
-    const targetEntryElements = document.querySelectorAll(".entry-url")
-    const entryUrls = Array.from(targetEntryElements, a => a.href)
-    resolve(entryUrls)
+const observeEntryList = () => {
+  // **
+  // 物件データの差し込み先が出来上がるのを監視して、データ差し込みアクションを待機する
+  // Masonryが走る = attributeが変更される = エントリーリストが出来上がった = 物件データ差し込めるの意
+  // *
+
+  // 監視対象のnode
+  const target = document.querySelector(".portal-entry-list")
+  // 監視開始
+  return PromiseMutationObserver(target)
+}
+
+const setReadMoreButtonEvent = json => {
+  const readMoreRef = json[0].next_ref
+  const readMoreButton = document.querySelector('.portal-entry-load-more')
+  readMoreButton.addEventListener('click', function() {showBukkenData(readMoreRef)},
+  {
+    capture: false,
+    once: true,
+    passive: false
   })
 }
 
-const fetchEntryArray = urls => {
+const entriesJsonUrlReturner = ref => {
+  const tag = document.documentElement.getAttribute ('data-tag') || ''
+  const tagType = document.documentElement.getAttribute ('data-tag-type') || 0
+  const pageSize = tag && tagType != 0 ? 10 : 30
+  const refParam = ref != null ? `&ref=${ encodeURIComponent(ref) }` : ''
+  const url = `/entries.json?limit=${ pageSize }&tag=${ encodeURIComponent(tag) }${ refParam }`
+  // console.log(url)
+  return [url]
+}
+
+const fetchJson = urls => {
+  console.log('[BukkenDataFan]', `Getting BukkenData…`)
   const asyncFetch = urls.map( url => {
     return fetch(url)
       .then(response => {
         try {
           if (response.ok) {
-          console.log("Fetch: ", `${response.url} => ${response.status}`)
-          return response.text() // レスポンスをテキストとして変換する
+          console.log('[BukkenDataFan]', `Fetch: ${response.url} => response: ${response.status}`)
+          return response.json() // レスポンスをjsonとして処理する
           } else {
-            throw new Error(`FetchError: ${response.url} => ${response.status}`)
+            throw new Error(`[BukkenDataFan] FetchError: ${response.url} => response: ${response.status}`)
           }
         } catch (error) {
           console.error(error)
@@ -62,53 +109,68 @@ const fetchEntryArray = urls => {
   return Promise.all(asyncFetch)
 }
 
-const extractDatafromEntry = entries => {
-  const extractedData = entries.map( entry => {
-    // DOM parse
-    const parseEntryDOM = new Promise((resolve, reject) => {
-      const parse = new DOMParser().parseFromString(entry, "text/html")
-      resolve(parse)
-    })
-    // 物件の記事のDOMを整形する…… :innocent:
-    return parseEntryDOM.then(document => {
-      const extractEntryData = document.querySelector(".entry-data")// 記事下部の物件データ
-      const getTableRow = extractEntryData.querySelectorAll("tr")// 物件データのtr抽出
-      const disclaimerNote = extractEntryData.querySelector("p.note")// 物件データについてる免責文章
-      
-      const deleteUnnecessaryDOM = ()=> {
-        // p.note消す
-        extractEntryData.removeChild(disclaimerNote);
-        // tr要素が5つ以上あるとき配列4番目以降のtrを消す(goodroomのロゴ消したい…)
-        if (getTableRow.length >= 5) {
-          for (let index = 4; index < getTableRow.length; index++) {
-            // console.log(getTableRow)
-            getTableRow[index].parentNode.removeChild(getTableRow[index]);
-          }
-        }
+const createBukkenData = json => {
+  const entriesArray = json[0].entries
+  const createDOM = entriesArray.map( entry => {
+    return new Promise((resolve, reject) => {
+      const dataObject = {
+        所在地: entry.data.addr,
+        賃料: entry.data.chinryou,
+        売価: entry.data.baika,
+        面積: entry.data.menseki,
+        最寄り: entry.data.moyori,
       }
-      deleteUnnecessaryDOM()
-      
-      return extractEntryData;
+      // dataの中からvalueがあるものだけ抽出する
+      const filteredData = Object.keys(dataObject)
+                                 .filter(key => dataObject[key] !== '') // 条件で絞り込む
+                                 .reduce((obj, key) => {
+                                   obj[key] = dataObject[key]
+                                   return obj
+                                 }, {})
+
+      function loopTableData() {
+        let tableData = ''
+        for(let key of Object.keys(filteredData)) {
+          tableData += `
+            <tr>
+              <th>${key}</th>
+              <td>${filteredData[key]}</td>
+            </tr>
+          `
+        }
+        return tableData
+      }
+
+      const dataDOMLiteral =
+        `
+        <div class="entry-data">
+          <table>
+            <tbody>
+              ${loopTableData()}
+            </tbody>
+          </table>
+        </div>
+        `
+
+      resolve(dataDOMLiteral)
     })
   })
-  return Promise.all(extractedData)
+  return Promise.all(createDOM)
 }
 
 const insertDataIntoEntryCards = (data) => {
   const bukkenData = data
-  console.log('bukkenData',bukkenData)
+  let cards = [...document.querySelectorAll(".entry-url")]
+  // もっとみるボタン押下したとき、物件データの数で追加分のDOM箇所を判定する
+  if (cards.length > 30) { cards = cards.slice(-bukkenData.length) }
   
-  const cards = document.querySelectorAll(".entry-url")
-  // 各エントリのカードに該当の物件データを挿入する
-  cards.forEach((card, index) => {
-    card.nextElementSibling.insertAdjacentElement("afterend", bukkenData[index])})
-}
+  // console.log(bukkenData.length)
+  // console.log(cards)
 
-async function fetchData() {
-  const urls = await entryUrlArray().catch(error => console.error(error))
-  const fetchEntries = await fetchEntryArray(urls).catch(error => console.error(error))
-  const extractData = await extractDatafromEntry(fetchEntries).catch(error => console.error(error))
-  const insertingData = await insertDataIntoEntryCards(extractData).catch(error => console.error(error))
+  // 各エントリのカードに該当の物件データを挿入する
+  return Promise.all(cards.map((card, index) => {
+    card.nextElementSibling.insertAdjacentHTML("afterend", bukkenData[index])
+  }))
 }
 
 
@@ -171,11 +233,38 @@ const reMasonry = () => {
   })
 }
 
-async function showBukkenData() {
-  await fetchData().catch(error => console.error(error))
+// getDataFunc
+async function getBukkenData(ref) {
+  const insertReadyFlag = observeEntryList().catch(error => console.error(error))
+  async function getDataFlow() {
+    const urls = entriesJsonUrlReturner(ref)
+    const fetch = await fetchJson(urls).catch(error => console.error(error))
+    const createDataDOM = await createBukkenData(fetch).catch(error => console.error(error))
+    const setEvent = setReadMoreButtonEvent(fetch)
+    return createDataDOM
+  }
+  // 挿入先DOMの監視と差し込むデータの準備を並列で待つ
+  return Promise.all([insertReadyFlag, getDataFlow()]).then(data => {
+    return data[1] // 整形済みDOMデータだけ返す
+  })
+}
+
+// InsertDataFunc
+async function insertBukkenData(data) {
+  insertDataIntoEntryCards(data)
+}
+
+// mainFunc
+async function showBukkenData(ref) {
+  const getData = await getBukkenData(ref).catch(error => console.error(error))
+  // console.log(getData)
+  const insertData = await insertBukkenData(getData).catch(error => console.error(error))
   await stylingBukkenData().catch(error => console.error(error))
   await reMasonry().catch(error => console.error(error))
+  console.log('[BukkenDataFan]','Inserting BukkenData completed, Enjoy!')
 }
+showBukkenData()
+
 
 // Your code end...
 
