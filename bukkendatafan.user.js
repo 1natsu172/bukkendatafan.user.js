@@ -251,17 +251,18 @@ async function getBukkenData(ref) {
 
 // InsertDataFunc
 async function insertBukkenData(data) {
-  insertDataIntoEntryCards(data)
+  await insertDataIntoEntryCards(data)
 }
 
 // mainFunc
 async function showBukkenData(ref) {
   const getData = await getBukkenData(ref).catch(error => console.error(error))
   // console.log(getData)
-  const insertData = await insertBukkenData(getData).catch(error => console.error(error))
-  await stylingBukkenData().catch(error => console.error(error))
-  await reMasonry().catch(error => console.error(error))
-  console.log('[BukkenDataFan]','Inserting BukkenData completed, Enjoy!')
+  const insertData = await insertBukkenData(getData).then(()=> 
+  console.log('[BukkenDataFan]','Inserted BukkenData')).catch(error => console.error(error))
+  await stylingBukkenData().catch(error => console.error(error)).then(()=> console.log('[BukkenDataFan]','Injected StyleSheet'))
+  await reMasonry().then(()=> console.log('[BukkenDataFan]','Relocated cards')).catch(error => console.error(error))
+  console.log('[BukkenDataFan]','BukkenData completed, Enjoy!')
 }
 showBukkenData()
 
