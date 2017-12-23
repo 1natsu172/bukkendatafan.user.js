@@ -6,6 +6,7 @@
 // @author       1natsu
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.2/babel.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.16.0/polyfill.js
+// @require      https://unpkg.com/imagesloaded@4/imagesloaded.pkgd.min.js
 // @match        https://bukkenfan.jp/*
 // @updateURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
 // @downloadURL https://raw.githubusercontent.com/1natsu172/bukkendatafan.user.js/master/bukkendatafan.user.js
@@ -221,17 +222,33 @@ const stylingBukkenData = () => {
 const reMasonry = () => {
   return new Promise((resolve, reject) => {
       if (typeof Masonry !== 'undefined') {
-        var msnry = new Masonry(".portal-entry-list", {
-          itemSelector: ".portal-entry", // target item
-          columnWidth: 240,
-          gutter: 15 // margin
-        })
-        resolve()
+        setTimeout(() => {
+          var msnry = new Masonry(".portal-entry-list", {
+            itemSelector: ".portal-entry", // target item
+            columnWidth: 240,
+            gutter: 15 // margin
+          })
+          resolve()
+        }, 500)
       } else {
         reject('Masonry見当たらない')
       }
   })
 }
+
+
+const waitImagesloaded = () => {
+  return new Promise((resolve,reject)=> {
+    const elem = document.querySelectorAll('.entry-image')
+    const observeImages = new imagesLoaded(elem, {background: true})
+    observeImages.on('always', instance => {
+      resolve()
+    })
+    .on('progress', (instance, image) => {
+    })
+  })
+}
+
 
 // getDataFunc
 async function getBukkenData(ref) {
@@ -261,6 +278,7 @@ async function showBukkenData(ref) {
   const insertData = await insertBukkenData(getData).then(()=> 
   console.log('[BukkenDataFan]','Inserted BukkenData')).catch(error => console.error(error))
   await stylingBukkenData().catch(error => console.error(error)).then(()=> console.log('[BukkenDataFan]','Injected StyleSheet'))
+  await waitImagesloaded().then(()=> console.log('[BukkenDataFan]','Loaded cards image'))
   await reMasonry().then(()=> console.log('[BukkenDataFan]','Relocated cards')).catch(error => console.error(error))
   console.log('[BukkenDataFan]','BukkenData completed, Enjoy!')
 }
