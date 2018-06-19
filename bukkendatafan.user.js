@@ -91,7 +91,7 @@ const setReadMoreButtonEvent = json => {
 const entriesJsonUrlReturner = ref => {
   const tag = document.documentElement.getAttribute("data-tag") || "";
   const tagType = document.documentElement.getAttribute("data-tag-type") || 0;
-  const pageSize = tag && tagType != 0 ? 10 : 12;
+  const pageSize = tag && tagType != 0 ? 10 : 24;
   const refParam = ref != null ? `&ref=${encodeURIComponent(ref)}` : "";
   const url = `/entries.json?limit=${pageSize}&tag=${encodeURIComponent(
     tag
@@ -179,7 +179,7 @@ const insertDataIntoEntryCards = data => {
   const newerEntryFeed = document.querySelector(".portal-entries");
   let cards = [...newerEntryFeed.querySelectorAll(".entry-url")];
   // もっとみるボタン押下したとき、物件データの数で追加分のDOM箇所を判定する
-  if (cards.length > 12) {
+  if (cards.length > 24) {
     cards = cards.slice(-bukkenData.length);
   }
 
@@ -259,7 +259,17 @@ const waitImagesloaded = () => {
 
 // getDataFunc
 async function getBukkenData(ref) {
-  const insertReadyFlag = waitElement(".portal-entry-list").catch(error =>
+  const insertReadyFlag = waitElement(".portal-entry-list").then(v=> {
+    // エントリーのDOMが全件できあがるのを待機する
+    return new Promise((resolve,reject)=> {
+      let entryCount = v.childElementCount
+      for (let index = entryCount; index <= 24; index++) {
+        entryCount = v.childElementCount
+      }
+      resolve()
+    })
+  })
+  .catch(error =>
     console.error(error)
   );
   async function getDataFlow() {
